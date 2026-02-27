@@ -1,0 +1,327 @@
+# Solutions for the tasks of week one "Vector Deepdive" for the course *Spatiotemporal Datascience*.
+
+## Task 1
+Download the datasets swissTLM3D and swissboundaries3d from swisstopo. Using swissTLM3d and swissboundaries3d, calculate the percentage of area covered by forest per canton. Visualize the results (in a map and / or a plot).
+
+### Preparation
+Here as a first step the relevant libraries are loaded and the file paths to the datasets are defined. Then, the layers of both datasets are listed to identify which layers contain the relevant information for the analysis. These layers are then inspected to find the relevant columns and categories for the analysis.
+
+```{r}
+# Load required library
+library(sf)
+library(tidyverse)
+library(tictoc)
+
+# Define file paths
+path_boundaries <- "data/swissBOUNDARIES3D_1_5_LV95_LN02.gpkg"
+path_tlm3d <- "data/SWISSTLM3D_2025.gpkg"
+
+
+# List all layers in the boundaries dataset 
+st_layers(path_boundaries)
+
+# List all layers in the TLM3D dataset
+st_layers(path_tlm3d)
+```
+
+#### Load and inspect the relevant layers
+```{r}
+# Load the canton boundaries layer
+cantons <- st_read(path_boundaries, layer = "tlm_kantonsgebiet")
+
+# Print column names and first few rows to find the canton name/ID column
+colnames(cantons)
+head(cantons)
+
+```
+```{r}
+# Load landcover layer from TLM3D
+landcover <- st_read(path_tlm3d, layer = "tlm_bb_bodenbedeckung")
+
+# Print column names to find the land cover type column
+colnames(landcover)
+
+unique(landcover$objektart)
+```
+
+For the analysis the following layers and columns are relevant:  
+- **Canton boundaries:** `tlm_kantonsgebiet` layer, `name` column for canton names  
+- **Land cover:** `tlm_bb_bodenbedeckung` layer, `objektart` column for land cover types, where the categories "Wald", "Gebueschwald" and "Wald offen" indicate forest areas.
+
+
+### Analysis
+
+```{r}
+# Start timer
+tic("Task 1: sf processing")
+
+## Prepare data
+
+# Load cantons and calculate total area per canton
+cantons <- st_read(path_boundaries, layer = "tlm_kantonsgebiet") |>
+  # Fix potential topology issues
+  st_make_valid() |>
+  # Calculate area and convert to numeric to drop units
+  mutate(canton_area = as.numeric(st_area(geom))) 
+
+# Load landcover, filter for forest types, and fix potential topology issues
+forests <- st_read(path_tlm3d, layer = "tlm_bb_bodenbedeckung") |>
+  filter(objektart %in% c("Wald", "Gebueschwald", "Wald offen")) |>
+  st_make_valid()
+
+# Ensure Coordinate Reference Systems (CRS) match before intersection
+if(st_crs(cantons) != st_crs(forests)) {
+  forests <- st_transform(forests, st_crs(cantons))
+}
+
+
+
+## Spatial intersection and area calculation
+
+# Intersect forest polygons with canton boundaries 
+forests_per_canton <- st_intersection(forests, cantons)
+
+# Calculate the area of these intersected forest fragments
+forests_per_canton <- forests_per_canton |>
+  mutate(forest_area = as.numeric(st_area(geom)))
+
+# Aggregate the total forest area by canton
+forest_summary <- forests_per_canton |>
+  st_drop_geometry() |>
+  group_by(name) |>
+  summarise(total_forest_area = sum(forest_area, na.rm = TRUE))
+
+# Join back to the cantons sf object and calculate the percentage
+cantons_result <- cantons |>
+  left_join(forest_summary, by = "name") |>
+  mutate(
+    # Replace NA with 0 for cantons with exactly 0 forest cover
+    total_forest_area = replace_na(total_forest_area, 0),
+    forest_pct = (total_forest_area / canton_area) * 100
+  )
+
+# Stop timer
+toc()
+```
+
+
+#### Visualizations
+```{r}
+## Map
+# Define breaks for the colorbar for better readability
+rng <- range(cantons_result$forest_pct, na.rm = TRUE)
+breaks_vec <- seq(from = floor(rng[1]/5)*5, to = ceiling(rng[2]/5)*5, by = 5)
+
+# Plot the choropleth map
+ggplot(data = cantons_result) +
+  geom_sf(aes(fill = forest_pct), color = "white", linewidth = 0.2) +
+  scale_fill_viridis_c(
+    name = "Forest Cover (%)",
+    option = "viridis",
+    breaks = breaks_vec, # Set specific tick marks
+    guide = guide_colorbar(
+      barheight = unit(4, "cm"), 
+      barwidth = unit(0.5, "cm"), 
+      frame.colour = "black",     # Add frame for clarity
+      ticks.colour = "black"
+    )
+  ) +
+  theme_minimal() +
+  # Remove grid lines and axis text 
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    legend.position = "right"
+  ) +
+  labs(
+    title = "Forest Cover Percentage by Swiss Canton",
+    subtitle = "Data sources: swissTLM3D and swissboundaries3d"
+  )
+```
+```{r}
+## Bar plot
+# Create a bar plot ordered by percentage
+cantons_result |>
+  st_drop_geometry() |> # Remove geometry for standard plotting
+  ggplot(aes(x = reorder(name, -forest_pct), y = forest_pct)) +
+  # Use geom_col for pre-calculated values. Using a static color from viridis palette.
+  geom_col(fill = "#3b528b", width = 0.8) +
+  # Add text labels on top of bars for precise reading
+  geom_text(aes(label = round(forest_pct, 1)), vjust = -0.5, size = 3) +
+  # Adjust y-axis scale to fit labels nicely
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  theme_minimal() +
+  # Rotate x-axis labels to prevent overlapping and remove axis lines
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank()) +
+  labs(
+    title = "Swiss Cantons Ranked by Forest Cover Percentage",
+    x = "", # Remove x-axis label as canton names are self-explanatory
+    y = "Forest Cover (%)"
+  )
+
+```
+
+## Task 2
+We have prepared a duckdb database on moodle (wald-kantone.duckdb). This database contains two layers: The forest data from swissTLM3D and the canton boundaries from swissBOUNDARIES3D.
+
+Use this dataset and with the help of DuckDB in practice, recreate Task 1 and measure the execution time using the R package tictoc.
+
+Compare the execution time with Task 1. Discuss!
+
+### Preparation
+
+```{r}
+# Load required libraries
+library(duckdb)
+library(DBI)
+library(tictoc)
+library(dplyr)
+
+# Define database path
+db_path <- "data/wald-kantone.duckdb"
+
+
+# Connect and inspect the database
+con <- dbConnect(duckdb::duckdb(), db_path)
+dbListTables(con)
+```
+
+### Analysis
+```{r}
+# Start the timer
+tic("Task 2 DuckDB processing")
+
+# Load the spatial extension required for ST_ functions
+dbExecute(con, "INSTALL spatial;")
+dbExecute(con, "LOAD spatial;")
+
+# Execute the spatial join, intersection, and area calculation directly in SQL
+query <- "
+  SELECT 
+    k.name,
+    ST_Area(k.geom) AS canton_area,
+    SUM(ST_Area(ST_Intersection(w.geom, k.geom))) AS total_forest_area,
+    (SUM(ST_Area(ST_Intersection(w.geom, k.geom))) / ST_Area(k.geom)) * 100 AS forest_pct
+  FROM kantone k
+  JOIN wald w ON ST_Intersects(k.geom, w.geom)
+  GROUP BY k.name, k.geom
+"
+
+# Fetch the results into an R dataframe
+duckdb_results <- dbGetQuery(con, query)
+
+# Stop the timer
+toc()
+
+# Disconnect from the database
+dbDisconnect(con, shutdown = TRUE)
+
+# View the results
+head(duckdb_results)
+```
+
+### Visualisation
+```{r}
+# Create a bar plot ordered by percentage for DuckDB results
+duckdb_results |>
+  ggplot(aes(x = reorder(name, -forest_pct), y = forest_pct)) +
+  # Use geom_col for pre-calculated values. Using a static color from viridis palette.
+  geom_col(fill = "#3b528b", width = 0.8) +
+  # Add text labels on top of bars for precise reading
+  geom_text(aes(label = round(forest_pct, 1)), vjust = -0.5, size = 3) +
+  # Adjust y-axis scale to fit labels nicely
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  theme_minimal() +
+  # Rotate x-axis labels to prevent overlapping and remove axis lines
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank()) +
+  labs(
+    title = "Swiss Cantons Ranked by Forest Cover (%) - DuckDB",
+    x = "", # Remove x-axis label as canton names are self-explanatory
+    y = "Forest Cover (%)"
+  )
+```
+
+### Discussion
+In the performance measure with tictoc we can see that DuckDB completet the spatial intersection and aggregation much faster compared to the "standard" R process with the sf library. This is because DuckDB uses vectorized, multi-threaded execution and optimizes the SQL query plan before running it, while sf processes geometries sequentially in R's memory. It is also visible that there are small discrepancies in the percentage values for the forest cover per canton (DuckDB slightly lower percentages). A reason for this could be that i used multiple forest categories in task 1, while in the DuckDB database maybe fewer or only 1 category was defined. According to Gemini, `st_intersection` also requires strict geometry validity which alters the polygons slightly before calculation. The raw DuckDB approach processes the geometries exactly as they are in the database, which may lead to additional, minor area calculation differences.
+
+
+
+## Task 3
+Without consulting external help, try and specify the DE-9IM string for the queen and bishop’s case as shown in Figure 1.
+
+Concentrate on the boundary-boundary intersection. Note:
+
+No intersection: F  
+Point intersection: 0  
+Line intersetion: 1  
+Any intersection: *  
+
+```{r}
+# load and check available layers in the chessboard dataset
+path_chessboard <- "data/chessboard.gpkg"
+st_layers(path_chessboard)
+
+# visualize both layers
+grid_dest <- st_read(path_chessboard, layer = "grid_dest")
+colnames(grid_dest)
+grid_dest |> plot()
+
+grid_orig <- st_read(path_chessboard, layer = "grid_orig")
+colnames(grid_orig)
+grid_orig |> plot()
+
+
+# Assign a dummy CRS to prevent transformation errors
+st_crs(grid_dest) <- 2056
+st_crs(grid_orig) <- 2056
+```
+### Queen's case
+The Queen can move in all eight directions, so its target squares can share either a corner (point) or an edge (line) with the origin square. Therefore, the DE-9IM pattern for the Queen's case would be: `F***T****`
+```{r}
+# Define custom predicate for the Queen's case
+st_queen <- \(x, y) st_relate(x, y, pattern = "F***T****")
+
+# Filter grid and generate sample points based on the predicate
+grid_queen <- grid_dest[grid_orig, , op = st_queen] |> 
+  st_sample(1000, type = "hexagonal", by_polygon = TRUE)
+
+# Plot chessboard with Queen's case
+ggplot() +
+  # Background destination grid
+  geom_sf(data = grid_dest, fill = "lightgrey", color = "white") + 
+  # Origin square in the center
+  geom_sf(data = grid_orig, fill = "lightblue", color = "white") +
+  # Sampled points in the valid Queen's movement squares
+  geom_sf(data = grid_queen, color = "red", size = 0.5) + 
+  theme_void() +
+  labs(title = "Queen's Case Intersection (F***T****)")
+  
+```
+### Bishop's case
+The Bishop moves diagonally, meaning its valid target squares only touch the origin square at a single, distinct corner. Therefore, the DE-9IM pattern for the Bishop's case would be: `F***0****`
+```{r}
+# Define custom predicate for the Bishop's case
+st_queen <- \(x, y) st_relate(x, y, pattern = "F***0****")
+
+# Filter grid and generate sample points based on the predicate
+grid_queen <- grid_dest[grid_orig, , op = st_queen] |> 
+  st_sample(1000, type = "hexagonal", by_polygon = TRUE)
+
+# Plot chessboard with Bishop's case
+ggplot() +
+  # Background destination grid
+  geom_sf(data = grid_dest, fill = "lightgrey", color = "white") + 
+  # Origin square in the center
+  geom_sf(data = grid_orig, fill = "lightblue", color = "white") +
+  # Sampled points in the valid Queen's movement squares
+  geom_sf(data = grid_queen, color = "red", size = 0.5) + 
+  theme_void() +
+  labs(title = "Bishop's Case Intersection (F***0****)")
+```
+

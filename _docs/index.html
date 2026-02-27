@@ -406,7 +406,7 @@ all geometries</code></pre>
 <span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Stop timer</span></span>
 <span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Task 1: sf processing: 275.13 sec elapsed</code></pre>
+<pre><code>Task 1: sf processing: 169.03 sec elapsed</code></pre>
 </div>
 </div>
 <section id="visualizations" class="level4">
@@ -547,7 +547,7 @@ all geometries</code></pre>
 <span id="cb40-16"><a href="#cb40-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Stop the timer</span></span>
 <span id="cb40-17"><a href="#cb40-17" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Task 2 DuckDB processing: 152.88 sec elapsed</code></pre>
+<pre><code>Task 2 DuckDB processing: 95.2 sec elapsed</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Disconnect from the database</span></span>
 <span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a><span class="fu">dbDisconnect</span>(con, <span class="at">shutdown =</span> <span class="cn">TRUE</span>)</span>
@@ -555,13 +555,13 @@ all geometries</code></pre>
 <span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a><span class="co"># View the results</span></span>
 <span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(duckdb_results)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>                    name canton_area total_forest_area forest_pct
-1                Thurgau   994329312         199547265   20.06853
-2 Appenzell Ausserrhoden   242836488          76630041   31.55623
-3                 Schwyz   907882151         270867177   29.83506
-4                 Glarus   685314332         166199659   24.25160
-5               Obwalden   490583307         174175234   35.50370
-6  Appenzell Innerrhoden   172476022          47223210   27.37958</code></pre>
+<pre><code>        name canton_area total_forest_area forest_pct
+1        Uri  1076534778         154092586   14.31376
+2     Aargau  1403798009         489877996   34.89662
+3     Luzern  1493517344         406495581   27.21733
+4 Graubünden  7105296294        1614791500   22.72659
+5     Genève   282487196          32900992   11.64690
+6     Valais  5224635588        1039721966   19.90037</code></pre>
 </div>
 </div>
 </section>

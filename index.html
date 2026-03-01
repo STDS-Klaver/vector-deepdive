@@ -406,7 +406,7 @@ all geometries</code></pre>
 <span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Stop timer</span></span>
 <span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Task 1: sf processing: 168.44 sec elapsed</code></pre>
+<pre><code>Task 1: sf processing: 167.2 sec elapsed</code></pre>
 </div>
 </div>
 <section id="visualizations" class="level4">
@@ -552,7 +552,7 @@ all geometries</code></pre>
 <span id="cb40-16"><a href="#cb40-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Stop the timer</span></span>
 <span id="cb40-17"><a href="#cb40-17" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Task 2 DuckDB processing: 95.88 sec elapsed</code></pre>
+<pre><code>Task 2 DuckDB processing: 103.76 sec elapsed</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Disconnect from the database</span></span>
 <span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a><span class="fu">dbDisconnect</span>(con, <span class="at">shutdown =</span> <span class="cn">TRUE</span>)</span>
@@ -561,12 +561,12 @@ all geometries</code></pre>
 <span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(duckdb_results)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>                   name canton_area total_forest_area forest_pct
-1 Appenzell Innerrhoden   172476022          47223210   27.37958
-2                   Zug   238732633          62366121   26.12384
-3                  Vaud  3212016742         944974599   29.41998
-4          Schaffhausen   298418432         125433609   42.03280
-5            St. Gallen  2028199748         536656166   26.45973
-6                Zürich  1728941724         503369756   29.11433</code></pre>
+1               Thurgau   994329312         199547265   20.06853
+2 Appenzell Innerrhoden   172476022          47223210   27.37958
+3                   Zug   238732633          62366121   26.12384
+4                  Vaud  3212016742         944974599   29.41998
+5                Valais  5224635588        1039721966   19.90037
+6                  Bern  5958504819        1667241901   27.98088</code></pre>
 </div>
 </div>
 </section>

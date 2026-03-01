@@ -115,14 +115,15 @@ breaks_vec <- seq(from = floor(rng[1]/5)*5, to = ceiling(rng[2]/5)*5, by = 5)
 # Plot the choropleth map
 ggplot(data = cantons_result) +
   geom_sf(aes(fill = forest_pct), color = "white", linewidth = 0.2) +
-  scale_fill_viridis_c(
+  scale_fill_distiller(
     name = "Forest Cover (%)",
-    option = "viridis",
-    breaks = breaks_vec, # Set specific tick marks
+    palette = "Greens",
+    direction = 1,
+    breaks = breaks_vec, 
     guide = guide_colorbar(
       barheight = unit(4, "cm"), 
       barwidth = unit(0.5, "cm"), 
-      frame.colour = "black",     # Add frame for clarity
+      frame.colour = "black",     
       ticks.colour = "black"
     )
   ) +
@@ -146,11 +147,11 @@ ggplot(data = cantons_result) +
 cantons_result |>
   st_drop_geometry() |> # Remove geometry for standard plotting
   ggplot(aes(x = reorder(name, -forest_pct), y = forest_pct)) +
-  # Use geom_col for pre-calculated values. Using a static color from viridis palette.
+  # Use geom_col for pre-calculated values.
   geom_col(fill = "#3b528b", width = 0.8) +
   # Add text labels on top of bars for precise reading
   geom_text(aes(label = round(forest_pct, 1)), vjust = -0.5, size = 3) +
-  # Adjust y-axis scale to fit labels nicely
+  # Adjust y-axis scale to fit labels
   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
   theme_minimal() +
   # Rotate x-axis labels to prevent overlapping and remove axis lines
@@ -164,6 +165,10 @@ cantons_result |>
   )
 
 ```
+
+### Discussion
+The results show that the percentage of forest cover varies between ~12 % and ~49 % across all cantons, with Ticino having the highest percentage and the Genève the lowest. Since the dataset is relatively large, this calculation method takes quite some time. To speed this up without changing the general approach, we could also simplify the geometries before the intersection, but this would mean that we have to sacrifice some precision of the results. Additionally, I found that the choice of which forest categories to consider change the results by a few percentage points, showing that the definition of "forest" can have a significant impact on the results.
+
 
 ## Task 2
 We have prepared a duckdb database on moodle (wald-kantone.duckdb). This database contains two layers: The forest data from swissTLM3D and the canton boundaries from swissBOUNDARIES3D.
@@ -248,7 +253,7 @@ duckdb_results |>
 ```
 
 ### Discussion
-In the performance measure with tictoc we can see that DuckDB completet the spatial intersection and aggregation much faster compared to the "standard" R process with the sf library. This is because DuckDB uses vectorized, multi-threaded execution and optimizes the SQL query plan before running it, while sf processes geometries sequentially in R's memory. It is also visible that there are small discrepancies in the percentage values for the forest cover per canton (DuckDB slightly lower percentages). A reason for this could be that i used multiple forest categories in task 1, while in the DuckDB database maybe fewer or only 1 category was defined. According to Gemini, `st_intersection` also requires strict geometry validity which alters the polygons slightly before calculation. The raw DuckDB approach processes the geometries exactly as they are in the database, which may lead to additional, minor area calculation differences.
+In the performance measure with tictoc we can see that DuckDB completet the spatial intersection and aggregation much faster compared to the "standard" R process with the sf library. This is because DuckDB uses vectorized, multi-threaded execution and optimizes the SQL query plan before running it, while sf processes geometries sequentially in R's memory. While the order of the cantons by forest cover remains the same, there are slight discrepancies in the percentage values between the two methods (DuckDB gives slightly lower percentages). A reason for this could be that I used multiple forest categories in task 1, while in the DuckDB database maybe fewer or only 1 category was defined. According to Gemini, `st_intersection` also requires strict geometry validity which alters the polygons slightly before calculation. The raw DuckDB approach processes the geometries exactly as they are in the database, which may lead to additional, minor area calculation differences.
 
 
 
@@ -293,12 +298,13 @@ grid_queen <- grid_dest[grid_orig, , op = st_queen] |>
 
 # Plot chessboard with Queen's case
 ggplot() +
-  # Background destination grid
-  geom_sf(data = grid_dest, fill = "lightgrey", color = "white") + 
-  # Origin square in the center
-  geom_sf(data = grid_orig, fill = "lightblue", color = "white") +
-  # Sampled points in the valid Queen's movement squares
-  geom_sf(data = grid_queen, color = "red", size = 0.5) + 
+  geom_sf(data = grid_dest, aes(fill = "Destination"), color = "white") + 
+  geom_sf(data = grid_orig, aes(fill = "Origin"), color = "white") +
+  # Convert sample to sf and map color inside aes()
+  geom_sf(data = st_as_sf(grid_queen), aes(color = "Queen's case"), size = 0.5) + 
+  # Define the manual colors for legends
+  scale_fill_manual(name = NULL, values = c("Destination" = "lightgrey", "Origin" = "lightblue")) +
+  scale_color_manual(name = NULL, values = c("Queen's case" = "red")) +
   theme_void() +
   labs(title = "Queen's Case Intersection (F***T****)")
   
@@ -307,21 +313,24 @@ ggplot() +
 The Bishop moves diagonally, meaning its valid target squares only touch the origin square at a single, distinct corner. Therefore, the DE-9IM pattern for the Bishop's case would be: `F***0****`
 ```{r}
 # Define custom predicate for the Bishop's case
-st_queen <- \(x, y) st_relate(x, y, pattern = "F***0****")
+st_bishop <- \(x, y) st_relate(x, y, pattern = "F***0****")
 
 # Filter grid and generate sample points based on the predicate
-grid_queen <- grid_dest[grid_orig, , op = st_queen] |> 
+grid_bishop <- grid_dest[grid_orig, , op = st_bishop] |> 
   st_sample(1000, type = "hexagonal", by_polygon = TRUE)
 
 # Plot chessboard with Bishop's case
 ggplot() +
-  # Background destination grid
-  geom_sf(data = grid_dest, fill = "lightgrey", color = "white") + 
-  # Origin square in the center
-  geom_sf(data = grid_orig, fill = "lightblue", color = "white") +
-  # Sampled points in the valid Queen's movement squares
-  geom_sf(data = grid_queen, color = "red", size = 0.5) + 
+  geom_sf(data = grid_dest, aes(fill = "Destination"), color = "white") + 
+  geom_sf(data = grid_orig, aes(fill = "Origin"), color = "white") +
+  # Convert sample to sf and map color inside aes()
+  geom_sf(data = st_as_sf(grid_bishop), aes(color = "Bishop's case"), size = 0.5) + 
+  # Define the manual colors for legends
+  scale_fill_manual(name = NULL, values = c("Destination" = "lightgrey", "Origin" = "lightblue")) +
+  scale_color_manual(name = NULL, values = c("Bishop's case" = "red")) +
   theme_void() +
   labs(title = "Bishop's Case Intersection (F***0****)")
 ```
 
+## Use of AI
+I tried to solve the tasks mostly without the help of AI, but I used Gemini correct my solutions and improve some of my code if I was stuck or unsure.
